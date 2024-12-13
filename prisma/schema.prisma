@@ -1,0 +1,148 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "./generated/client"
+  previewFeatures = ["deno"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model deposits {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  timestamp    Int
+  sender       String
+  owner        String
+  assets       String
+  shares       String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model deposits_with_referral {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  timestamp    Int
+  referrer     String
+  referee      String
+  assets       String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model dispatch_to_stake {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  delegator    String
+  amount       String
+  cursor       BigInt? @map("_cursor")
+  timestamp    String
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model dispatch_to_withdraw_queue {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  amount       String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model received_funds {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  amount       String
+  sender       String
+  unprocessed  String
+  intransit    String
+  timestamp    Int
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model reward_distribution {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  timestamp    Int
+  amount       String
+  referee      String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model transfer {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  timestamp    String
+  from         String
+  to           String
+  value        String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model unstake_action {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  amount       String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model unstake_intent_started {
+  block_number Int
+  tx_index     Int     @default(0)
+  event_index  Int     @default(0)
+  amount       String
+  cursor       BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
+
+model withdraw_queue {
+  block_number                         Int
+  tx_index                             Int     @default(0)
+  event_index                          Int     @default(0)
+  tx_hash                              String
+  caller                               String
+  amount_strk                          String
+  amount_kstrk                         String
+  request_id                           BigInt
+  is_claimed                           Boolean
+  claim_time                           Int
+  receiver                             String
+  cumulative_requested_amount_snapshot String
+  is_rejected                          Boolean @default(false)
+  timestamp                            Int
+  cursor                               BigInt? @map("_cursor")
+
+  @@unique([block_number, tx_index, event_index])
+  @@index([cursor])
+}
