@@ -9,16 +9,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =================================================================================
+// =========================== Pre Processed Models ================================
+// =================================================================================
+
 model deposits {
   block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
+  tx_index     Int @default(0)
+  event_index  Int @default(0)
   timestamp    Int
-  sender       String
-  owner        String
-  assets       String
-  shares       String
-  cursor       BigInt? @map("_cursor")
+
+  sender String
+  owner  String
+  assets String
+  shares String
+  cursor BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
@@ -26,65 +31,14 @@ model deposits {
 
 model deposits_with_referral {
   block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
+  tx_index     Int @default(0)
+  event_index  Int @default(0)
   timestamp    Int
-  referrer     String
-  referee      String
-  assets       String
-  cursor       BigInt? @map("_cursor")
 
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
-}
-
-model dispatch_to_stake {
-  block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  delegator    String
-  amount       String
-  cursor       BigInt? @map("_cursor")
-  timestamp    String
-
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
-}
-
-model dispatch_to_withdraw_queue {
-  block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  amount       String
-  cursor       BigInt? @map("_cursor")
-
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
-}
-
-model received_funds {
-  block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  amount       String
-  sender       String
-  unprocessed  String
-  intransit    String
-  timestamp    Int
-  cursor       BigInt? @map("_cursor")
-
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
-}
-
-model reward_distribution {
-  block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  timestamp    Int
-  amount       String
-  referee      String
-  cursor       BigInt? @map("_cursor")
+  referrer String
+  referee  String
+  assets   String
+  cursor   BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
@@ -92,57 +46,107 @@ model reward_distribution {
 
 model transfer {
   block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
+  tx_index     Int    @default(0)
+  event_index  Int    @default(0)
   timestamp    String
-  from         String
-  to           String
-  value        String
-  cursor       BigInt? @map("_cursor")
+
+  from   String
+  to     String
+  value  String
+  cursor BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
 }
 
-model unstake_action {
+model withdrawals {
   block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  amount       String
-  cursor       BigInt? @map("_cursor")
+  tx_index     Int    @default(0)
+  event_index  Int    @default(0)
+  timestamp    String
+
+  sender   String
+  receiver String
+  owner    String
+  assets   String
+  shares   String
+
+  cursor BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
 }
 
-model unstake_intent_started {
-  block_number Int
-  tx_index     Int     @default(0)
-  event_index  Int     @default(0)
-  amount       String
-  cursor       BigInt? @map("_cursor")
+model referral_account_in {
+  timestamp     String
+  referral_code String @id
+  assets        String
+  shares        String
 
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
+  @@unique([timestamp])
 }
 
-model withdraw_queue {
-  block_number                         Int
-  tx_index                             Int     @default(0)
-  event_index                          Int     @default(0)
-  tx_hash                              String
-  caller                               String
-  amount_strk                          String
-  amount_kstrk                         String
-  request_id                           BigInt
-  is_claimed                           Boolean
-  claim_time                           Int
-  receiver                             String
-  cumulative_requested_amount_snapshot String
-  is_rejected                          Boolean @default(false)
-  timestamp                            Int
-  cursor                               BigInt? @map("_cursor")
+model referral_account_out {
+  timestamp     String
+  referral_code String  @id
+  assets        String
+  shares        String
+  rewards_paid  Boolean @default(false)
+
+  @@unique([timestamp])
+}
+
+// =================================================================================
+// ========================== Post Processed Models ================================
+// =================================================================================
+
+enum TransactionType {
+  DEPOSIT    @map("deposit")
+  WITHDRAWAL @map("withdrawal")
+}
+
+// Used for storing deposits, withdrawals in a ledger format
+model Ledger {
+  id String @id @default(uuid()) @db.Uuid
+
+  block_number  Int
+  tx_index      Int             @default(0)
+  event_index   Int             @default(0)
+  order_index   Int // Used for ordering partial fills of withdrawals with deposits, is @unique in (block_number, event_index, event_index)
+  user          String
+  amount        Decimal         @db.Decimal(30, 0)
+  type          TransactionType
+  referral_code String?
+  Commissions   Commissions[]
 
   @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
+}
+
+// Exchange rate of strk/xstrk at a given block number
+model ExchangeRate {
+  block_number Int     @id
+  rate         Decimal @db.Decimal(30, 0)
+}
+
+// Commissions for each referral code till the particular ledger_id
+model Commissions {
+  // Referrer Foreign relation
+  referrer      Referrers @relation(fields: [referral_code], references: [referral_code])
+  referral_code String
+
+  commission_amount Decimal @db.Decimal(30, 0)
+  is_paid           Boolean @default(false)
+
+  // Ledger Foreign relation
+  ledger    Ledger @relation(fields: [ledger_id], references: [id])
+  ledger_id String @db.Uuid
+
+  @@id([ledger_id, referral_code])
+}
+
+model Referrers {
+  referral_code String        @id
+  referrer      String        @unique
+  percentage    Float
+  Commissions   Commissions[]
 }
