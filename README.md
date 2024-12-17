@@ -3,7 +3,7 @@ This project uses deno. So install deno first
 `deno install` `deno run -A npm:prisma generate`
 
 
-#### Event Emission
+### Event Emission
 Events are emitted during each function in this particular order
 1.  Depositing
 	- `Transfer` with from address = 0x0

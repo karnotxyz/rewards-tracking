@@ -23,22 +23,10 @@ model deposits {
   owner  String
   assets String
   shares String
+
+  referrer String?
+
   cursor BigInt? @map("_cursor")
-
-  @@unique([block_number, tx_index, event_index])
-  @@index([cursor])
-}
-
-model deposits_with_referral {
-  block_number Int
-  tx_index     Int @default(0)
-  event_index  Int @default(0)
-  timestamp    Int
-
-  referrer String
-  referee  String
-  assets   String
-  cursor   BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
@@ -75,25 +63,6 @@ model withdrawals {
 
   @@unique([block_number, tx_index, event_index])
   @@index([cursor])
-}
-
-model referral_account_in {
-  timestamp     String
-  referral_code String @id
-  assets        String
-  shares        String
-
-  @@unique([timestamp])
-}
-
-model referral_account_out {
-  timestamp     String
-  referral_code String  @id
-  assets        String
-  shares        String
-  rewards_paid  Boolean @default(false)
-
-  @@unique([timestamp])
 }
 
 // =================================================================================
