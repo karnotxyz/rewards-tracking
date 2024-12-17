@@ -92,7 +92,7 @@ export default function transform({ header, events }: Block) {
       value,
     };
 
-    console.log("event data", transferData);
+    console.log("transfer event data", transferData);
     return transferData;
   });
 }

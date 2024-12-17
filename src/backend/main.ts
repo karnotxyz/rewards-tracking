@@ -3,11 +3,14 @@ import { Module } from "@nestjs/common";
 
 import { StatusController } from "./controllers/status.controller.ts";
 import { PrismaService } from "./services/prisma.service.ts";
+import { RewardsController } from "./controllers/rewards.controller.ts";
+import { LedgerService } from "./services/ledger.service.ts";
 
 @Module({
-  providers: [PrismaService],
+  providers: [PrismaService, LedgerService],
   controllers: [
     StatusController,
+    RewardsController, // TODO: Remove the rewards controller in production
   ],
 })
 class AppModule {}

@@ -1,13 +1,15 @@
 import type { Config } from "npm:@apibara/indexer";
 import type {
   Block,
+  Event,
   FieldElement,
   Starknet,
 } from "npm:@apibara/indexer@0.4.1/starknet";
 import type { Postgres } from "npm:@apibara/indexer@0.4.1/sink/postgres";
-import { hash } from "https://esm.sh/starknet@6.11.0";
+import { hash, num } from "https://esm.sh/starknet@6.11.0";
 
 import { getAddresses, getNetwork, toBigInt } from "./utils.ts";
+import { standardiseAddress } from "./utils.ts";
 
 export const config: Config<Starknet, Postgres> = {
   streamUrl: Deno.env.get("STREAM_URL"),
@@ -29,6 +31,15 @@ export const config: Config<Starknet, Postgres> = {
     tableName: "deposits",
   },
 };
+
+// #[derive(Drop, Serde, starknet::Event)]
+// struct Referral {
+//     #[key]
+//     pub referrer: ByteArray,
+//     #[key]
+//     pub referee: ContractAddress,
+//     pub assets: u256,
+// }
 
 // #[derive(Drop, PartialEq, starknet::Event)]
 // pub struct Deposit {
@@ -54,11 +65,41 @@ export default function transform({ header, events }: Block) {
       throw new Error("deposits:Expected event with data");
     }
 
-    console.log(
-      "event keys and data length",
-      event.keys.length,
-      event.data.length,
-    );
+    let referral_code;
+    if (receipt.events) {
+      // Find the index of the `Deposit` event by matching the event index
+      // Since this from receipt of the same transaction of the same block
+      // Tx_index and Block_number are the same for all events
+      // console.log("receipt events", receipt.events);
+      const ind = receipt.events?.findIndex((e: Event) => {
+        return Number(e.index ?? 0) == event.index;
+      });
+
+      // Check if exactly next event if exists is the `Referral` event
+      if (ind && receipt.events.length > ind + 1) {
+        if (
+          standardiseAddress(receipt.events[ind + 1].keys?.[0] as string) ==
+            standardiseAddress(
+              hash.getSelectorFromName("Referral") as FieldElement as string,
+            )
+        ) {
+          const referrer = receipt.events[ind + 1]?.keys?.[2];
+
+          if (!referrer) {
+            throw new Error("Referrer is required");
+          }
+
+          referral_code = num.toHexString(referrer).toString()
+            .match(/.{1,2}/g)
+            ?.reduce(
+              (acc, char) => acc + String.fromCharCode(parseInt(char, 16)),
+              "",
+            )?.replace(/\0/g, ""); // Remove null bytes
+
+          console.log("referral code", referral_code, receipt.transactionHash);
+        }
+      }
+    }
 
     // The 0th key is the selector(name of the event)
     // The following are those that are indexed using #[key] macro
@@ -80,9 +121,10 @@ export default function transform({ header, events }: Block) {
       owner,
       assets,
       shares,
+      referrer: referral_code,
     };
 
-    console.log("event data", depositData);
+    console.log("deposit data", depositData);
     return depositData;
   });
 }

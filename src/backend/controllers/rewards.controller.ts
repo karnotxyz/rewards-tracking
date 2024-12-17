@@ -1,13 +1,13 @@
-import { Controller, Post } from "@nestjs/common";
+import { Controller, Get, Post } from "@nestjs/common";
+import { LedgerService } from "../services/ledger.service.ts";
 
 @Controller()
 export class RewardsController {
-  constructor() {
-    console.log("RewardsController instantiated");
-  }
+  constructor(private readonly ledgerService: LedgerService) {}
 
-  @Post()
-  postRewards(): string {
-    return "Rewards posted";
+  // TODO: Update to Post later
+  @Get()
+  async populateLedger() {
+    await this.ledgerService.populateLedger();
   }
 }

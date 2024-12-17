@@ -78,7 +78,7 @@ export function toNumber(el: string) {
   return Number(el.toString());
 }
 
-export function standariseAddress(address: string | bigint) {
+export function standardiseAddress(address: string | bigint) {
   let _a = address;
   if (!address) {
     _a = "0";

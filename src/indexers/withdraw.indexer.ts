@@ -85,7 +85,7 @@ export default function transform({ header, events }: Block) {
       shares,
     };
 
-    console.log("event data", withdrawData);
+    console.log("withdraw event data", withdrawData);
     return withdrawData;
   });
 }

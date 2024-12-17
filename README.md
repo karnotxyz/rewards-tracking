@@ -1,7 +1,16 @@
+### Installation
 This project uses deno. So install deno first
+1. Then to install dependencies run: 
+`deno install`
 
-`deno install` `deno run -A npm:prisma generate`
+2. Update `.env` using the `.env.example` and update the dna token from apibara
 
+3. For generating the prisma client and tables run:
+`deno run -A npm:prisma generate && deno run -A npm:prisma db push`
+
+
+### Running the Server
+`deno run dev`
 
 ### Event Emission
 Events are emitted during each function in this particular order
