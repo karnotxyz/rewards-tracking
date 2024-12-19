@@ -26,6 +26,7 @@ export class LedgerService {
   async populateLedger() {
     this.logger.log("Populating ledger...");
 
+    // Get the checkpoints from the processed state table
     const [lastDeposit, lastWithdrawal, lastTransfer] = await this.prisma
       .$transaction([
         this.prisma.processedState.findUniqueOrThrow({
@@ -44,15 +45,124 @@ export class LedgerService {
       .findMany({
         where: {
           OR: [
-            block_number: { gt: lastDeposit.block_number },
-          ]
+            {
+              block_number: {
+                gt: lastDeposit.block_number,
+              },
+            },
+            {
+              AND: [
+                {
+                  block_number: lastDeposit.block_number,
+                },
+                {
+                  OR: [
+                    {
+                      tx_index: {
+                        gt: lastDeposit.tx_index,
+                      },
+                    },
+                    {
+                      AND: [
+                        {
+                          tx_index: lastDeposit.tx_index,
+                        },
+                        {
+                          event_index: {
+                            gt: lastDeposit.event_index,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       });
+
     let withdrawals: Array<WithWithdrawalEventType> = await this.prisma
-      .withdrawals
-      .findMany();
-    let transfers: Array<WithTransferEventType> = await this.prisma
-      .transfer.findMany();
+      .withdrawals.findMany({
+        where: {
+          OR: [
+            {
+              block_number: {
+                gt: lastWithdrawal.block_number,
+              },
+            },
+            {
+              AND: [
+                {
+                  block_number: lastWithdrawal.block_number,
+                },
+                {
+                  OR: [
+                    {
+                      tx_index: {
+                        gt: lastWithdrawal.tx_index,
+                      },
+                    },
+                    {
+                      AND: [
+                        {
+                          tx_index: lastWithdrawal.tx_index,
+                        },
+                        {
+                          event_index: {
+                            gt: lastWithdrawal.event_index,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+    let transfers: Array<WithTransferEventType> = await this.prisma.transfer
+      .findMany({
+        where: {
+          OR: [
+            {
+              block_number: {
+                gt: lastTransfer.block_number,
+              },
+            },
+            {
+              AND: [
+                {
+                  block_number: lastTransfer.block_number,
+                },
+                {
+                  OR: [
+                    {
+                      tx_index: {
+                        gt: lastTransfer.tx_index,
+                      },
+                    },
+                    {
+                      AND: [
+                        {
+                          tx_index: lastTransfer.tx_index,
+                        },
+                        {
+                          event_index: {
+                            gt: lastTransfer.event_index,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
 
     deposits = deposits.map((deposit) => {
       return { ...deposit, eventType: "deposit" };
