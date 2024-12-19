@@ -22,8 +22,8 @@ model deposits {
 
   sender String
   owner  String
-  assets String
-  shares String
+  assets Decimal @db.Decimal(30, 0)
+  shares Decimal @db.Decimal(30, 0)
 
   referrer String?
 
@@ -41,7 +41,7 @@ model transfer {
 
   from   String
   to     String
-  value  String
+  value  Decimal @db.Decimal(30, 0)
   cursor BigInt? @map("_cursor")
 
   @@unique([block_number, tx_index, event_index])
@@ -57,8 +57,8 @@ model withdrawals {
   sender   String
   receiver String
   owner    String
-  assets   String
-  shares   String
+  assets   Decimal @db.Decimal(30, 0)
+  shares   Decimal @db.Decimal(30, 0)
 
   cursor BigInt? @map("_cursor")
 
@@ -119,4 +119,17 @@ model Referrers {
   referrer      String        @unique
   percentage    Float
   Commissions   Commissions[]
+}
+
+enum EventType {
+  DEPOSIT    @map("deposit")
+  WITHDRAWAL @map("withdrawal")
+  TRANSFER   @map("transfer")
+}
+
+model ProcessedState {
+  type         EventType @unique
+  block_number Int
+  tx_index     Int
+  event_index  Int
 }

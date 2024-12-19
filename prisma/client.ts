@@ -7,8 +7,7 @@
 
 // export * from "./generated/client/index.d.ts";
 
-
 // @ts-types="generated/index.d.ts"
-import { PrismaClient } from 'generated/index.js'
+import { PrismaClient } from "generated/index.js";
 
 export const prisma = new PrismaClient();
