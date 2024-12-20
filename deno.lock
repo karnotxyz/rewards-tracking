@@ -8,7 +8,8 @@
     "npm:@nestjs/common@^10.4.15": "10.4.15_reflect-metadata@0.2.2_rxjs@7.8.1",
     "npm:@nestjs/core@^10.4.15": "10.4.15_@nestjs+common@10.4.15__reflect-metadata@0.2.2__rxjs@7.8.1_reflect-metadata@0.2.2_rxjs@7.8.1",
     "npm:@nestjs/platform-express@^10.4.15": "10.4.15_@nestjs+common@10.4.15__reflect-metadata@0.2.2__rxjs@7.8.1_@nestjs+core@10.4.15__@nestjs+common@10.4.15___reflect-metadata@0.2.2___rxjs@7.8.1__reflect-metadata@0.2.2__rxjs@7.8.1",
-    "npm:@prisma/client@6.1.0": "6.1.0",
+    "npm:@prisma/client@*": "6.1.0_prisma@6.1.0",
+    "npm:@prisma/client@6.1.0": "6.1.0_prisma@6.1.0",
     "npm:@types/node@*": "22.5.4",
     "npm:prisma@*": "6.1.0"
   },
@@ -104,6 +105,12 @@
     },
     "@prisma/client@6.1.0": {
       "integrity": "sha512-AbQYc5+EJKm1Ydfq3KxwcGiy7wIbm4/QbjCKWWoNROtvy7d6a3gmAGkKjK0iUCzh+rHV8xDhD5Cge8ke/kiy5Q=="
+    },
+    "@prisma/client@6.1.0_prisma@6.1.0": {
+      "integrity": "sha512-AbQYc5+EJKm1Ydfq3KxwcGiy7wIbm4/QbjCKWWoNROtvy7d6a3gmAGkKjK0iUCzh+rHV8xDhD5Cge8ke/kiy5Q==",
+      "dependencies": [
+        "prisma"
+      ]
     },
     "@prisma/debug@6.1.0": {
       "integrity": "sha512-0himsvcM4DGBTtvXkd2Tggv6sl2JyUYLzEGXXleFY+7Kp6rZeSS3hiTW9mwtUlXrwYbJP6pwlVNB7jYElrjWUg=="

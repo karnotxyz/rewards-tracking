@@ -2,13 +2,22 @@ import { Injectable, Logger } from "@nestjs/common";
 import { deposits, transfer, withdrawals } from "generated/index.d.ts";
 import { prisma } from "../../../prisma/client.ts";
 import { sortEntries } from "./utils.ts";
-import type { PrismaClient, TransactionType } from "generated/index.d.ts";
+import type {
+  Ledger,
+  PrismaClient,
+  TransactionType,
+} from "generated/index.d.ts";
+
+// The types of the prisma should be imported this way
+// While the type of the prisma schema models will come from the generated files
+import { Decimal } from "@prisma/client/runtime/library";
 
 export type WithDepositEventType = deposits & { eventType?: "deposit" };
 export type WithWithdrawalEventType = withdrawals & {
   eventType?: "withdrawal";
 };
 export type WithTransferEventType = transfer & { eventType?: "transfer" };
+type LedgerWithOptionalId = Omit<Ledger, "id"> & Partial<Pick<Ledger, "id">>;
 
 @Injectable()
 export class LedgerService {
@@ -27,20 +36,85 @@ export class LedgerService {
     this.logger.log("Populating ledger...");
 
     // Get the checkpoints from the processed state table
-    const [lastDeposit, lastWithdrawal, lastTransfer] = await this.prisma
+    let [lastDeposit, lastWithdrawal, lastTransfer] = await this.prisma
       .$transaction([
-        this.prisma.processedState.findUniqueOrThrow({
+        this.prisma.processedState.findUnique({
           where: { type: "DEPOSIT" },
         }),
-        this.prisma.processedState.findUniqueOrThrow({
+        this.prisma.processedState.findUnique({
           where: { type: "WITHDRAWAL" },
         }),
-        this.prisma.processedState.findUniqueOrThrow({
+        this.prisma.processedState.findUnique({
           where: { type: "TRANSFER" },
         }),
       ]);
 
-    // Add an event type to each deposit, withdrawal, and transfer
+    if (!lastDeposit) {
+      this.logger.log("No deposit checkpoint found");
+      lastDeposit = {
+        type: "DEPOSIT",
+        block_number: 0,
+        tx_index: 0,
+        event_index: 0,
+      };
+
+      this.logger.log("Creating deposit checkpoint");
+      await this.prisma.processedState.create({
+        data: {
+          type: "DEPOSIT",
+          block_number: 0,
+          tx_index: 0,
+          event_index: 0,
+        },
+      });
+      this.logger.log("Deposit checkpoint created");
+    }
+
+    if (!lastWithdrawal) {
+      this.logger.log("No withdrawal checkpoint found");
+      lastWithdrawal = {
+        type: "WITHDRAWAL",
+        block_number: 0,
+        tx_index: 0,
+        event_index: 0,
+      };
+
+      this.logger.log("Creating withdrawal checkpoint");
+      await this.prisma.processedState.create({
+        data: {
+          type: "WITHDRAWAL",
+          block_number: 0,
+          tx_index: 0,
+          event_index: 0,
+        },
+      });
+
+      this.logger.log("Withdrawal checkpoint created");
+    }
+
+    if (!lastTransfer) {
+      this.logger.log("No transfer checkpoint found");
+      lastTransfer = {
+        type: "TRANSFER",
+        block_number: 0,
+        tx_index: 0,
+        event_index: 0,
+      };
+
+      this.logger.log("Creating transfer checkpoint");
+
+      await this.prisma.processedState.create({
+        data: {
+          type: "TRANSFER",
+          block_number: 0,
+          tx_index: 0,
+          event_index: 0,
+        },
+      });
+
+      this.logger.log("Transfer checkpoint created");
+    }
+
     let deposits: Array<WithDepositEventType> = await this.prisma.deposits
       .findMany({
         where: {
@@ -164,6 +238,7 @@ export class LedgerService {
         },
       });
 
+    // Add an event type to each deposit, withdrawal, and transfer
     deposits = deposits.map((deposit) => {
       return { ...deposit, eventType: "deposit" };
     });
@@ -182,19 +257,22 @@ export class LedgerService {
     const updates = sortEntries([...deposits, ...withdrawals, ...transfers]);
     console.log("Updates: sorted by block number, tx index, and event index");
 
-    for (let i = 1; i < updates.length; i++) {
-      const update = updates[i];
-      const previous = updates[i - 1];
-      if (
-        update.block_number < previous.block_number &&
-        update.tx_index < previous.tx_index &&
-        update.event_index < previous.event_index
-      ) {
-        throw new Error("Invalid update order");
-      }
-    }
+    let currentLedgerTransactions = await this.prisma.ledger.findMany({});
 
-    let ledgerTransactions = [];
+    // sort them in order
+    currentLedgerTransactions = currentLedgerTransactions.sort((a, b) => {
+      if (a.block_number !== b.block_number) {
+        return a.block_number - b.block_number;
+      } else if (a.tx_index !== b.tx_index) {
+        return a.tx_index - b.tx_index;
+      } else if (a.event_index !== b.event_index) {
+        return a.event_index - b.event_index;
+      } else {
+        return a.order_index - b.order_index;
+      }
+    });
+
+    const newLedgerTransactions: LedgerWithOptionalId[] = [];
     for (const update of updates) {
       if (update.eventType === "deposit") {
         // Handle deposit event
@@ -208,74 +286,230 @@ export class LedgerService {
           type: "DEPOSIT" as TransactionType,
           referral_code: update.referrer ?? null,
         };
-        ledgerTransactions.push(deposit);
-      } else if (update.eventType === "withdrawal") {
+        newLedgerTransactions.push(deposit);
+      } else if (
+        update.eventType === "withdrawal" || update.eventType === "transfer"
+      ) {
+        let owner;
+        if (update.eventType === "withdrawal") {
+          owner = update.owner;
+        } else if (update.eventType === "transfer") {
+          owner = update.from;
+        } else {
+          throw new Error("Invalid event type");
+        }
+
         // Handle withdrawal event
-      } else if (update.eventType === "transfer") {
-        // Handle transfer event
+        // Get sum of the withdrawals uptill now
+        const withradrawalSum = currentLedgerTransactions.reduce(
+          (acc, curr) => {
+            if (curr.type === "WITHDRAWAL" && curr.user === owner) {
+              acc = acc.plus(curr.amount);
+            }
+            return acc;
+          },
+          new Decimal(0),
+        );
+
+        // Add withdrawals of the user that have been processed in this run
+        let totalWithdrawals = newLedgerTransactions.reduce(
+          (acc, curr) => {
+            if (curr.type == "WITHDRAWAL" && curr.user === owner) {
+              acc = acc.plus(curr.amount);
+            }
+            return acc;
+          },
+          new Decimal(withradrawalSum),
+        );
+
+        const user_processed_deposits: Ledger[] = currentLedgerTransactions
+          .filter((
+            entry,
+          ) => entry.type == "DEPOSIT" && entry.user === owner);
+        const current_unprocessed_deposits: LedgerWithOptionalId[] =
+          newLedgerTransactions.filter((
+            entry,
+          ) => entry.type == "DEPOSIT" && entry.user === owner);
+
+        const all_deposits = [
+          ...user_processed_deposits,
+          ...current_unprocessed_deposits,
+        ];
+
+        let matched_status = {
+          index: -1,
+          partial_remaining: new Decimal(0),
+        };
+        for (let i = 0; i < all_deposits.length; i++) {
+          const deposit = all_deposits.at(i);
+          if (!deposit?.amount) {
+            throw Error("Amount not present in deposit transaction");
+          }
+
+          if (deposit.amount.eq(totalWithdrawals)) {
+            matched_status = {
+              index: i,
+              partial_remaining: new Decimal(0),
+            };
+            break;
+          } else if (deposit.amount.gt(totalWithdrawals)) {
+            matched_status = {
+              index: i,
+              partial_remaining: deposit.amount.minus(totalWithdrawals),
+            };
+          }
+
+          totalWithdrawals = totalWithdrawals.minus(deposit?.amount);
+        }
+        if (matched_status.index === -1) {
+          this.logger.log(
+            "More withdrawals than deposits for user",
+            update.block_number,
+            update.tx_index,
+            update.event_index,
+          );
+          throw new Error("More withdrawals than deposits for user");
+        }
+
+        let yet_to_match;
+        if (update.eventType === "withdrawal") {
+          yet_to_match = update.shares;
+        } else if (update.eventType === "transfer") {
+          yet_to_match = update.value;
+        } else {
+          throw new Error("Invalid event type");
+        }
+        let order_index = 0;
+
+        // Start matching the current withdraw amount
+        // First mathching if any partial amount is remaining
+        if (matched_status.partial_remaining.gt(new Decimal(0))) {
+          const matched_amount = Decimal.min(
+            yet_to_match,
+            matched_status.partial_remaining,
+          );
+
+          const deposit = all_deposits.at(matched_status.index);
+          if (!deposit) {
+            throw new Error("Deposit not found while partial matching");
+          }
+
+          // Push withdrawal entry to ledger
+          const withdrawal = {
+            block_number: update.block_number,
+            tx_index: update.tx_index,
+            event_index: update.event_index,
+            order_index: order_index,
+            user: owner,
+            amount: matched_amount,
+            type: "WITHDRAWAL" as TransactionType,
+            referral_code: deposit.referral_code,
+          };
+          yet_to_match = yet_to_match.minus(matched_amount);
+          order_index += 1;
+
+          newLedgerTransactions.push(withdrawal);
+        }
+        // Matching other deposits now
+        for (let i = matched_status.index + 1; i < all_deposits.length; i++) {
+          const deposit = all_deposits.at(i);
+          if (!deposit?.amount) {
+            throw Error("Amount not present in deposit transaction");
+          }
+          const matched_amount = Decimal.min(
+            yet_to_match,
+            deposit.amount,
+          );
+
+          // Push withdrawal entry to ledger
+          const withdrawal: LedgerWithOptionalId = {
+            block_number: update.block_number,
+            tx_index: update.tx_index,
+            event_index: update.event_index,
+            order_index: order_index,
+            user: owner,
+            amount: matched_amount,
+            type: "WITHDRAWAL",
+            referral_code: deposit.referral_code,
+          };
+
+          order_index += 1;
+          yet_to_match = yet_to_match.minus(matched_amount);
+          newLedgerTransactions.push(withdrawal);
+
+          // In case of transfers just append the same transaction as deposit to receiver
+          if (update.eventType === "transfer") {
+            const transfer: LedgerWithOptionalId = {
+              block_number: update.block_number,
+              tx_index: update.tx_index,
+              event_index: update.event_index,
+              order_index: order_index,
+              user: update.to,
+              amount: matched_amount,
+              type: "DEPOSIT" as TransactionType,
+              referral_code: deposit.referral_code,
+            };
+
+            order_index += 1;
+            newLedgerTransactions.push(transfer);
+          }
+
+          if (yet_to_match.eq(new Decimal(0))) {
+            break;
+          }
+        }
       } else {
         throw new Error("Invalid event type");
       }
     }
 
-    this.prisma.$transaction([
-      this.prisma.ledger.createMany({
-        data: ledgerTransactions,
-      }),
+    this.prisma.$transaction(async () => {
+      this.logger.log("Updating ledger...");
+      await this.prisma.ledger.createMany({
+        data: newLedgerTransactions,
+      });
 
-      // Update the processed state
-      this.prisma.processedState.upsert({
-        create: {
-          type: "DEPOSIT",
-          block_number: 0,
-          tx_index: 0,
-          event_index: 0,
-        },
-        update: {
-          block_number: deposits[deposits.length - 1].block_number,
-          tx_index: deposits[deposits.length - 1].tx_index,
-          event_index: deposits[deposits.length - 1].event_index,
-        },
-        where: {
-          type: "DEPOSIT",
-        },
-      }),
+      if (deposits.length > 0) {
+        // Update the processed state
+        await this.prisma.processedState.update({
+          data: {
+            block_number: deposits[deposits.length - 1].block_number,
+            tx_index: deposits[deposits.length - 1].tx_index,
+            event_index: deposits[deposits.length - 1].event_index,
+          },
+          where: {
+            type: "DEPOSIT",
+          },
+        });
+      }
 
-      this.prisma.processedState.upsert({
-        create: {
-          type: "WITHDRAWAL",
-          block_number: 0,
-          tx_index: 0,
-          event_index: 0,
-        },
-        update: {
-          block_number: withdrawals[withdrawals.length - 1].block_number,
-          tx_index: withdrawals[withdrawals.length - 1].tx_index,
-          event_index: withdrawals[withdrawals.length - 1].event_index,
-        },
-        where: {
-          type: "WITHDRAWAL",
-        },
-      }),
+      if (withdrawals.length > 0) {
+        await this.prisma.processedState.update({
+          data: {
+            block_number: withdrawals[withdrawals.length - 1].block_number,
+            tx_index: withdrawals[withdrawals.length - 1].tx_index,
+            event_index: withdrawals[withdrawals.length - 1].event_index,
+          },
+          where: {
+            type: "WITHDRAWAL",
+          },
+        });
+      }
 
-      this.prisma.processedState.upsert({
-        create: {
-          type: "TRANSFER",
-          block_number: 0,
-          tx_index: 0,
-          event_index: 0,
-        },
-        update: {
-          block_number: transfers[transfers.length - 1].block_number,
-          tx_index: transfers[transfers.length - 1].tx_index,
-          event_index: transfers[transfers.length - 1].event_index,
-        },
-        where: {
-          type: "TRANSFER",
-        },
-      }),
-    ]);
+      if (transfers.length > 0) {
+        await this.prisma.processedState.update({
+          data: {
+            block_number: transfers[transfers.length - 1].block_number,
+            tx_index: transfers[transfers.length - 1].tx_index,
+            event_index: transfers[transfers.length - 1].event_index,
+          },
+          where: {
+            type: "TRANSFER",
+          },
+        });
+      }
+    });
 
-    console.log("Ledger updated", updates.length, "updates");
+    this.logger.log("Ledger populated successfully");
   }
 }

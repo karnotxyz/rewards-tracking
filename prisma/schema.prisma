@@ -84,7 +84,7 @@ model Ledger {
   event_index   Int             @default(0)
   order_index   Int // Used for ordering partial fills of withdrawals with deposits, is @unique in (block_number, event_index, event_index)
   user          String
-  amount        Decimal         @db.Decimal(30, 0)
+  amount        Decimal         @db.Decimal(30, 0) // xstrk amount
   type          TransactionType
   referral_code String?
   Commissions   Commissions[]
