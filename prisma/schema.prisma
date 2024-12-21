@@ -89,7 +89,7 @@ model Ledger {
   referral_code String?
   Commissions   Commissions[]
 
-  @@unique([block_number, tx_index, event_index])
+  @@unique([block_number, tx_index, event_index, order_index])
 }
 
 // Exchange rate of strk/xstrk at a given block number

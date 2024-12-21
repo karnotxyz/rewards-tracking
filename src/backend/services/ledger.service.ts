@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { deposits, transfer, withdrawals } from "generated/index.d.ts";
 import { prisma } from "../../../prisma/client.ts";
 import { sortEntries } from "./utils.ts";
+import { assert } from "@std/assert";
 import type {
   Ledger,
   PrismaClient,
@@ -400,10 +401,20 @@ export class LedgerService {
               index: i,
               partial_remaining: deposit.amount.minus(totalWithdrawals),
             };
+
+            this.logger.warn(
+              "Final matching now",
+              all_deposits[i],
+              totalWithdrawals,
+            );
             break;
           }
 
-          totalWithdrawals = totalWithdrawals.minus(deposit?.amount);
+          totalWithdrawals = totalWithdrawals.minus(deposit.amount);
+          matched_status = {
+            index: i,
+            partial_remaining: new Decimal(0),
+          };
         }
 
         this.logger.log("Matched status", matched_status);
