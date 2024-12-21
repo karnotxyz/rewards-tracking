@@ -9,8 +9,7 @@
     "@nestjs/platform-express": "npm:@nestjs/platform-express@^10.4.15",
     "@prisma/client": "npm:@prisma/client@6.1.0",
     "@std/assert": "jsr:@std/assert@1",
-    "generated/": "./node_modules/generated/",
-    "starknet": "npm:starknet@^6.11.0"
+    "generated/": "./node_modules/generated/"
   },
   "compilerOptions": {
     "experimentalDecorators": true,

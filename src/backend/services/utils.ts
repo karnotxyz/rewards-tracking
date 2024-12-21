@@ -1,4 +1,4 @@
-import { Account, RpcProvider } from "starknet";
+import { Account, RpcProvider } from "npm:starknet";
 import { assert } from "@std/assert";
 
 import {

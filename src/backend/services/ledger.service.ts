@@ -29,6 +29,7 @@ export class LedgerService {
     this.prisma = prisma;
     this.logger = new Logger(LedgerService.name);
     this.logger.log("LedgerService instantiated");
+    Decimal.set({ precision: 30, rounding: Decimal.ROUND_DOWN });
   }
 
   // First should get the last blcok number from the ledger
@@ -329,6 +330,7 @@ export class LedgerService {
         } else if (update.eventType === "transfer") {
           owner = update.from;
         } else {
+          this.logger.error("Invalid event type");
           throw new Error("Invalid event type");
         }
 
@@ -402,20 +404,37 @@ export class LedgerService {
               partial_remaining: deposit.amount.minus(totalWithdrawals),
             };
 
-            this.logger.warn(
-              "Final matching now",
-              all_deposits[i],
+            console.log(
+              "Substracting in the nested if",
               totalWithdrawals,
+              deposit.amount,
+              totalWithdrawals.minus(deposit.amount),
+              i,
             );
+
+            totalWithdrawals = totalWithdrawals.minus(
+              Decimal.min(totalWithdrawals, deposit.amount),
+            );
+
             break;
           }
 
+          // this.logger.debug("Matched deposit", i);
           totalWithdrawals = totalWithdrawals.minus(deposit.amount);
+
           matched_status = {
             index: i,
             partial_remaining: new Decimal(0),
           };
         }
+        this.logger.verbose(
+          all_deposits.reduce((acc, curr) => {
+            acc = acc.plus(curr.amount);
+            return acc;
+          }, new Decimal(0)).toString(),
+        );
+        // Assert that totalWithdrawals is zero here
+        assert(totalWithdrawals.eq(0), "Total withdrawals should be zero");
 
         this.logger.log("Matched status", matched_status);
         if (matched_status.index === -1) {
