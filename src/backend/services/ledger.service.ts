@@ -115,6 +115,8 @@ export class LedgerService {
       this.logger.log("Transfer checkpoint created");
     }
 
+    this.logger.log(lastDeposit, lastWithdrawal, lastTransfer);
+
     let deposits: Array<WithDepositEventType> = await this.prisma.deposits
       .findMany({
         where: {
@@ -272,8 +274,38 @@ export class LedgerService {
       }
     });
 
+    this.logger.log(
+      "Current ledger transactions",
+      currentLedgerTransactions.length,
+      "updates",
+      updates.length,
+      "deposits",
+      deposits.length,
+      "withdrawals",
+      withdrawals.length,
+      "transfers",
+      transfers.length,
+    );
+
     const newLedgerTransactions: LedgerWithOptionalId[] = [];
     for (const update of updates) {
+      if (
+        update.eventType === "withdrawal" || update.eventType === "transfer"
+      ) {
+        this.logger.log(
+          `Starting ${update.eventType} update for 🆕🆕🆕`,
+          update.block_number,
+          update.tx_index,
+          update.event_index,
+        );
+
+        this.logger.log(
+          "newLedgerTransactions",
+          newLedgerTransactions.length,
+          newLedgerTransactions[newLedgerTransactions.length - 1],
+        );
+      }
+
       if (update.eventType === "deposit") {
         // Handle deposit event
         const deposit = {
@@ -299,8 +331,7 @@ export class LedgerService {
           throw new Error("Invalid event type");
         }
 
-        // Handle withdrawal event
-        // Get sum of the withdrawals uptill now
+        // This is the sum of the withdrawals that have been added to ledger already
         const withradrawalSum = currentLedgerTransactions.reduce(
           (acc, curr) => {
             if (curr.type === "WITHDRAWAL" && curr.user === owner) {
@@ -311,7 +342,7 @@ export class LedgerService {
           new Decimal(0),
         );
 
-        // Add withdrawals of the user that have been processed in this run
+        // Add withdrawals of the user that are going to be processed in this run
         let totalWithdrawals = newLedgerTransactions.reduce(
           (acc, curr) => {
             if (curr.type == "WITHDRAWAL" && curr.user === owner) {
@@ -320,6 +351,11 @@ export class LedgerService {
             return acc;
           },
           new Decimal(withradrawalSum),
+        );
+
+        this.logger.log(
+          "Total withdrawals",
+          totalWithdrawals.toString(),
         );
 
         const user_processed_deposits: Ledger[] = currentLedgerTransactions
@@ -336,14 +372,27 @@ export class LedgerService {
           ...current_unprocessed_deposits,
         ];
 
+        if (update.eventType === "transfer") {
+          this.logger.log("Transfer value", update.value);
+          this.logger.log(
+            "Total deposits value",
+            all_deposits.reduce((acc, curr) => {
+              acc = acc.plus(curr.amount);
+              return acc;
+            }, new Decimal(0)),
+          );
+        }
+
         let matched_status = {
           index: -1,
           partial_remaining: new Decimal(0),
         };
         for (let i = 0; i < all_deposits.length; i++) {
-          const deposit = all_deposits.at(i);
-          if (!deposit?.amount) {
-            throw Error("Amount not present in deposit transaction");
+          const deposit = all_deposits[i];
+          if (!deposit.amount) {
+            throw Error(
+              "Amount not present in deposit transaction",
+            );
           }
 
           if (deposit.amount.eq(totalWithdrawals)) {
@@ -361,6 +410,8 @@ export class LedgerService {
 
           totalWithdrawals = totalWithdrawals.minus(deposit?.amount);
         }
+
+        this.logger.log("Matched status", matched_status);
         if (matched_status.index === -1) {
           this.logger.log(
             "More withdrawals than deposits for user",
@@ -409,6 +460,40 @@ export class LedgerService {
           order_index += 1;
 
           newLedgerTransactions.push(withdrawal);
+          // In case of transfers just append the same transaction as deposit to receiver
+          if (update.eventType === "transfer") {
+            const transfer: LedgerWithOptionalId = {
+              block_number: update.block_number,
+              tx_index: update.tx_index,
+              event_index: update.event_index,
+              order_index: order_index,
+              user: update.to,
+              amount: matched_amount,
+              type: "DEPOSIT" as TransactionType,
+              referral_code: deposit.referral_code,
+            };
+
+            order_index += 1;
+            newLedgerTransactions.push(transfer);
+
+            this.logger.log("Pushed transfer entry to ledger");
+          }
+          this.logger.log("Pushed partial withdrawal entry to ledger");
+        }
+
+        if (yet_to_match.eq(new Decimal(0))) {
+          if (
+            update.eventType === "withdrawal" || update.eventType === "transfer"
+          ) {
+            this.logger.log(
+              `Finished ${update.eventType} update for`,
+              update.block_number,
+              update.tx_index,
+              update.event_index,
+              "✅✅✅",
+            );
+          }
+          continue;
         }
         // Matching other deposits now
         for (let i = matched_status.index + 1; i < all_deposits.length; i++) {
@@ -436,6 +521,7 @@ export class LedgerService {
           order_index += 1;
           yet_to_match = yet_to_match.minus(matched_amount);
           newLedgerTransactions.push(withdrawal);
+          this.logger.log("Pushed withdrawal entry to ledger");
 
           // In case of transfers just append the same transaction as deposit to receiver
           if (update.eventType === "transfer") {
@@ -452,17 +538,35 @@ export class LedgerService {
 
             order_index += 1;
             newLedgerTransactions.push(transfer);
+
+            this.logger.log("Pushed transfer entry to ledger");
           }
 
           if (yet_to_match.eq(new Decimal(0))) {
             break;
           }
         }
+
+        console.log("does this get printed");
+
+        if (
+          update.eventType === "withdrawal" || update.eventType === "transfer"
+        ) {
+          this.logger.log(
+            `Finished ${update.eventType} update for`,
+            update.block_number,
+            update.tx_index,
+            update.event_index,
+          );
+        }
       } else {
         throw new Error("Invalid event type");
       }
     }
 
+    // Making the final transaction
+    // If any error in any transaction occurs
+    // the entire transaction will be rolled back
     this.prisma.$transaction(async () => {
       this.logger.log("Updating ledger...");
       await this.prisma.ledger.createMany({
