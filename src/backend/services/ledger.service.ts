@@ -395,17 +395,12 @@ export class LedgerService {
             );
           }
 
-          if (deposit.amount.eq(totalWithdrawals)) {
-            matched_status = {
-              index: i,
-              partial_remaining: new Decimal(0),
-            };
-            break;
-          } else if (deposit.amount.gt(totalWithdrawals)) {
+          if (deposit.amount.gte(totalWithdrawals)) {
             matched_status = {
               index: i,
               partial_remaining: deposit.amount.minus(totalWithdrawals),
             };
+            break;
           }
 
           totalWithdrawals = totalWithdrawals.minus(deposit?.amount);
@@ -413,11 +408,13 @@ export class LedgerService {
 
         this.logger.log("Matched status", matched_status);
         if (matched_status.index === -1) {
-          this.logger.log(
+          this.logger.error(
             "More withdrawals than deposits for user",
             update.block_number,
             update.tx_index,
             update.event_index,
+            "totalWithdrawals",
+            totalWithdrawals,
           );
           throw new Error("More withdrawals than deposits for user");
         }
@@ -434,7 +431,7 @@ export class LedgerService {
 
         // Start matching the current withdraw amount
         // First mathching if any partial amount is remaining
-        if (matched_status.partial_remaining.gt(new Decimal(0))) {
+        if (matched_status.partial_remaining.gt(0)) {
           const matched_amount = Decimal.min(
             yet_to_match,
             matched_status.partial_remaining,
@@ -481,7 +478,7 @@ export class LedgerService {
           this.logger.log("Pushed partial withdrawal entry to ledger");
         }
 
-        if (yet_to_match.eq(new Decimal(0))) {
+        if (yet_to_match.eq(0)) {
           if (
             update.eventType === "withdrawal" || update.eventType === "transfer"
           ) {
@@ -542,7 +539,7 @@ export class LedgerService {
             this.logger.log("Pushed transfer entry to ledger");
           }
 
-          if (yet_to_match.eq(new Decimal(0))) {
+          if (yet_to_match.eq(0)) {
             break;
           }
         }
