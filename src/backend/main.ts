@@ -4,9 +4,12 @@ import { Module } from "@nestjs/common";
 import { StatusController } from "./controllers/status.controller.ts";
 import { RewardsController } from "./controllers/rewards.controller.ts";
 import { LedgerService } from "./services/ledger.service.ts";
+import { LSTService } from "./services/lst.service.ts";
+import { ConfigService } from "./services/config.service.ts";
+import { ReferrerService } from "./services/referrer.service.ts";
 
 @Module({
-  providers: [LedgerService],
+  providers: [LedgerService, LSTService, ConfigService, ReferrerService],
   controllers: [
     StatusController,
     RewardsController, // TODO: Remove the rewards controller in production

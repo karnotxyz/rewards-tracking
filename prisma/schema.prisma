@@ -95,11 +95,12 @@ model Ledger {
 // Exchange rate of strk/xstrk at a given block number
 model ExchangeRate {
   block_number Int     @id
-  rate         Decimal @db.Decimal(30, 0)
+  rate         Decimal @db.Decimal(30, 18)
 }
 
 // Commissions for each referral code till the particular ledger_id
 model Commissions {
+  id BigInt @id @default(autoincrement())
   // Referrer Foreign relation
   referrer      Referrers @relation(fields: [referral_code], references: [referral_code])
   referral_code String
@@ -111,7 +112,7 @@ model Commissions {
   ledger    Ledger @relation(fields: [ledger_id], references: [id])
   ledger_id String @db.Uuid
 
-  @@id([ledger_id, referral_code])
+  @@unique([ledger_id, referral_code])
 }
 
 model Referrers {
@@ -127,6 +128,8 @@ enum EventType {
   TRANSFER   @map("transfer")
 }
 
+// The rows from `deposit`, `withdrawal` and `transfer`
+// for which ledger entries have been created
 model ProcessedState {
   type         EventType @unique
   block_number Int

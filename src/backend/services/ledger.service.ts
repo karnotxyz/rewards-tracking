@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { deposits, transfer, withdrawals } from "generated/index.d.ts";
-import { prisma } from "../../../prisma/client.ts";
+import { prisma } from "prisma/client.ts";
 import { sortEntries } from "./utils.ts";
 import { assert } from "@std/assert";
 import type {
@@ -594,7 +594,7 @@ export class LedgerService {
     // Making the final transaction
     // If any error in any transaction occurs
     // the entire transaction will be rolled back
-    this.prisma.$transaction(async () => {
+    await this.prisma.$transaction(async () => {
       this.logger.log("Updating ledger...");
       await this.prisma.ledger.createMany({
         data: newLedgerTransactions,

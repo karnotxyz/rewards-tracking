@@ -6,14 +6,17 @@ import {
   WithTransferEventType,
   WithWithdrawalEventType,
 } from "./ledger.service.ts";
+import { Ledger } from "generated/index.d.ts";
 
-type SortableEntry =
-  | WithDepositEventType
-  | WithWithdrawalEventType
-  | WithTransferEventType;
-export function sortEntries(
-  entries: Array<SortableEntry>,
-): Array<SortableEntry> {
+export function sortEntries<
+  T extends
+    | WithDepositEventType
+    | WithWithdrawalEventType
+    | WithTransferEventType
+    | Ledger,
+>(
+  entries: T[],
+): T[] {
   return entries.sort((a, b) => {
     if (a.block_number !== b.block_number) {
       return a.block_number - b.block_number;
@@ -21,20 +24,25 @@ export function sortEntries(
     if (a.tx_index !== b.tx_index) {
       return a.tx_index - b.tx_index;
     }
-    return a.event_index - b.event_index;
+    if ("order_index" in a && "order_index" in b) {
+      if (a.event_index !== b.event_index) {
+        return a.event_index - b.event_index;
+      }
+      return a.order_index - b.order_index;
+    } else {
+      return a.event_index - b.event_index;
+    }
   });
 }
 
 export function getProvider(): RpcProvider {
   assert(Deno.env.has("RPC_URL"), "RPC URL not set in .env");
-  // use this to explicitly read from .env of this project
-  // (VT: I have some global env variables set as well)
   return new RpcProvider({ nodeUrl: Deno.env.get("RPC_URL") });
 }
 
 export function getAccount(): Account {
   assert(Deno.env.has("PRIVATE_KEY"), "PRIVATE KEY not set in .env");
-  assert(Deno.env.has("ACCOUNT_ADDRESS"), "PRIVATE KEY not set in .env");
+  assert(Deno.env.has("ACCOUNT_ADDRESS"), "ACCOUNT ADDRESS not set in .env");
 
   // initialize provider
   const provider = getProvider();
