@@ -7,8 +7,8 @@ import type {
 import type { Postgres } from "npm:@apibara/indexer@0.4.1/sink/postgres";
 import { hash } from "https://esm.sh/starknet@6.11.0";
 
-import { toBigInt } from "./utils.ts";
-import { getAddresses, getNetwork } from "./utils.ts";
+import { toBigInt } from "./utils/utils.ts";
+import { getAddresses, getNetwork } from "./utils/utils.ts";
 
 export const config: Config<Starknet, Postgres> = {
   streamUrl: Deno.env.get("STREAM_URL"),

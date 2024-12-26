@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Commissions, Ledger, PrismaClient } from "generated/index.d.ts";
+import type { Commissions, PrismaClient } from "generated/index.d.ts";
 import { prisma } from "prisma/client.ts";
 import { assert } from "@std/assert";
 import { readReferrers, saveReferrers } from "./constants.ts";
@@ -52,8 +52,10 @@ export class ReferrerService {
 
     const allExchangeRates = await this.prisma.exchangeRate.findMany({});
 
-    let commissions = [];
+    const commissions = [];
     for (const referrer of allReferrers) {
+      this.logger.debug("Processing referrer", referrer.referral_code);
+
       const thisReferrerCommissions = processed_commissions.filter((c) =>
         c.referral_code === referrer.referral_code
       );
@@ -64,71 +66,93 @@ export class ReferrerService {
           return Number(b.id) - Number(a.id);
         })[0];
 
-      let ledgerEntriesToProcessFromIndex = ledgerEntries.findIndex((entry) =>
-        entry.id === lastProcessedCommissionThisReferrer.ledger_id
-      );
+      let ledgerEntriesToProcessFromIndex;
+
+      // If no entries are processed for this referrer,
+      // start from the beginning
+      if (!lastProcessedCommissionThisReferrer) {
+        ledgerEntriesToProcessFromIndex = 0;
+      } else {
+        ledgerEntriesToProcessFromIndex = ledgerEntries.findIndex((entry) =>
+          entry.id === lastProcessedCommissionThisReferrer.ledger_id
+        );
+      }
 
       let totalCommission = new Decimal(0);
 
-      const runningReferralAmount = new Decimal(0);
+      let runningReferralAmount = new Decimal(0);
 
-      const thisReferrerEntries = ledgerEntries.filter((entry) =>
-        entry.referral_code && entry.referral_code === referrer.referral_code
-      );
-      for (let i = 0; i < thisReferrerEntries.length; i++) {
+      let lastReferralAmountChangeIndex = 0;
+      for (let i = 0; i < ledgerEntries.length; i++) {
         const entry = ledgerEntries[i];
         if (
           entry.referral_code && entry.referral_code === referrer.referral_code
         ) {
+          const oldRunningReferralAmount = runningReferralAmount;
           // Update the running referral amount
           if (entry.type === "DEPOSIT") {
-            runningReferralAmount.add(new Decimal(entry.amount.toString()));
+            runningReferralAmount = runningReferralAmount.add(
+              new Decimal(entry.amount.toString()),
+            );
           } else if (entry.type === "WITHDRAWAL") {
-            runningReferralAmount.sub(new Decimal(entry.amount.toString()));
+            runningReferralAmount = runningReferralAmount.sub(
+              new Decimal(entry.amount.toString()),
+            );
           }
 
-          if (i < ledgerEntriesToProcessFromIndex) {
-            continue;
-          }
-
-          const exchangeRateAtBlockObj = allExchangeRates.find((rate) =>
-            rate.block_number === entry.block_number
-          );
-          let exchangeRateAtBlock = new Decimal(1);
-          if (!exchangeRateAtBlockObj) {
-            this.logger.error(
-              `Exchange rate not found for block number ${entry.block_number}`,
+          if (i > ledgerEntriesToProcessFromIndex) {
+            const exchangeRateAtBlockObj = allExchangeRates.find((rate) =>
+              rate.block_number === entry.block_number
             );
-            throw new Error("Exchange rate not found");
-            return;
-          }
-          exchangeRateAtBlock = exchangeRateAtBlockObj.rate;
-          let exchangeRateBefore = new Decimal(1);
-          if (i > 0 && allExchangeRates) {
-            const exchangeRateObjectBefore = allExchangeRates?.find((rate) =>
-              rate.block_number === thisReferrerEntries[i - 1]?.block_number
-            );
-            if (exchangeRateObjectBefore) {
-              exchangeRateBefore = exchangeRateObjectBefore.rate;
-            } else {
-              this.logger.error("Exchange rate not found");
+            let exchangeRateAtBlock = new Decimal(1);
+            if (!exchangeRateAtBlockObj) {
+              this.logger.error(
+                `Exchange rate not found for block number ${entry.block_number}`,
+              );
               throw new Error("Exchange rate not found");
             }
+            exchangeRateAtBlock = exchangeRateAtBlockObj.rate;
+            let exchangeRateBefore = new Decimal(1);
+            if (i > 0 && allExchangeRates) {
+              const exchangeRateObjectBefore = allExchangeRates?.find((rate) =>
+                rate.block_number ===
+                  ledgerEntries[lastReferralAmountChangeIndex]?.block_number
+              );
+              if (exchangeRateObjectBefore) {
+                exchangeRateBefore = exchangeRateObjectBefore.rate;
+              } else {
+                this.logger.error("Exchange rate not found");
+                throw new Error("Exchange rate not found");
+              }
+            }
+            const exchangeRateDifference = exchangeRateAtBlock.sub(
+              exchangeRateBefore,
+            );
+
+            // Calculate the commission
+            const commission = oldRunningReferralAmount.mul(
+              exchangeRateDifference,
+            ) // Total appreciation
+              .mul(15) // 15% commission taken by Endur
+              .mul( // Referrer's commission
+                new Decimal(referrer.percentage),
+              )
+              .div(new Decimal(100)) // For endur percentage
+              .div(new Decimal(100_00)); // For referral percentage
+
+            totalCommission = totalCommission.add(commission);
           }
-          const exchangeRateDifference = exchangeRateAtBlock.sub(
-            exchangeRateBefore,
-          );
 
-          // Calculate the commission
-          const commission = runningReferralAmount.mul(exchangeRateDifference) // Total appreciation
-            .mul(15) // 15% commission taken by Endur
-            .mul( // Referrer's commission
-              new Decimal(referrer.percentage),
-            ).div(new Decimal(100_00));
-
-          totalCommission.add(commission);
+          lastReferralAmountChangeIndex = i;
         }
       }
+
+      this.logger.debug(
+        "For referrer",
+        referrer.referral_code,
+        "commission is",
+        totalCommission,
+      );
 
       commissions.push({
         referral_code: referrer.referral_code,

@@ -54,16 +54,15 @@ export class LSTService {
 
     for (const entry of ledgerEntries) {
       const rate = await this.exchangeRateAt(entry.block_number);
-      console.log("Exchange rate at block number", entry.block_number, rate);
       exchangeRates.push({
         block_number: entry.block_number,
         rate,
       });
-      if (exchangeRates.length % 10 === 0) {
-        await sleep(2000);
+      if (exchangeRates.length % 25 === 0) {
+        await sleep(500);
       }
 
-      if (exchangeRates.length % 100 === 0) {
+      if (exchangeRates.length % 30 === 0) {
         await this.prisma.exchangeRate.createMany({
           data: exchangeRates,
         });
