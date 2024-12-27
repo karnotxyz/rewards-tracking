@@ -15,7 +15,7 @@ import { ReferrerService } from "./services/referrer.service";
     RewardsController,
   ],
 })
-class AppModule { }
+export class AppModule { }
 
 async function bootstrap() {
   try {
