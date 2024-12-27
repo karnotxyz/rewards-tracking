@@ -6,12 +6,20 @@ This project uses deno. So install deno first
 
 2. Update `.env` using the `.env.example` and update the dna token from apibara
 
-3. For generating the prisma client and tables run:
+3. Update the `REDIS_URL` in the `.env` file
+
+4. For generating the prisma client and tables run:
    `deno run -A npm:prisma generate && deno run -A npm:prisma db push`
 
-### Running the Server
+
+### 1. Start Indexers
+
+`chmod u+x ./start-indexers.sh && ./start-indexers.sh`
+
+### 2. Running the Server
 
 `deno run dev`
+
 
 ### Event Emission
 

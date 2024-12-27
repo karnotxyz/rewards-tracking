@@ -1,12 +1,12 @@
-import { Account, RpcProvider } from "npm:starknet";
-import { assert } from "@std/assert";
+import { Account, RpcProvider } from "starknet";
+import assert = require("assert");
 
 import {
   WithDepositEventType,
   WithTransferEventType,
   WithWithdrawalEventType,
-} from "./ledger.service.ts";
-import { Ledger } from "generated/index.d.ts";
+} from "./ledger.service";
+import { Ledger } from "@prisma/client";
 
 export function sortEntries<
   T extends
@@ -36,18 +36,18 @@ export function sortEntries<
 }
 
 export function getProvider(): RpcProvider {
-  assert(Deno.env.has("RPC_URL"), "RPC URL not set in .env");
-  return new RpcProvider({ nodeUrl: Deno.env.get("RPC_URL") });
+  assert(process.env.RPC_URL, "RPC URL not set in .env");
+  return new RpcProvider({ nodeUrl: process.env.RPC_URL });
 }
 
 export function getAccount(): Account {
-  assert(Deno.env.has("PRIVATE_KEY"), "PRIVATE KEY not set in .env");
-  assert(Deno.env.has("ACCOUNT_ADDRESS"), "ACCOUNT ADDRESS not set in .env");
+  assert(process.env.PRIVATE_KEY, "PRIVATE KEY not set in .env");
+  assert(process.env.ACCOUNT_ADDRESS, "ACCOUNT ADDRESS not set in .env");
 
   // initialize provider
   const provider = getProvider();
-  const privateKey = Deno.env.get("PRIVATE_KEY") as string;
-  const accountAddress = Deno.env.get("ACCOUNT_ADDRESS") as string;
+  const privateKey = process.env.PRIVATE_KEY as string;
+  const accountAddress = process.env.ACCOUNT_ADDRESS as string;
   return new Account(provider, accountAddress, privateKey);
 }
 
@@ -64,9 +64,9 @@ export interface NetworkConfig {
 }
 
 export function getNetwork(): Network {
-  assert(Deno.env.has("NETWORK"), "Network not configured in .env");
+  assert(process.env.NETWORK, "Network not configured in .env");
 
-  const network = Deno.env.get("NETWORK") as string;
+  const network = process.env.NETWORK as string;
   if (network == Network.sepolia) {
     return Network.sepolia;
   } else if (network == Network.mainnet) {

@@ -1,4 +1,7 @@
-import type { Referrers } from "generated/index.d.ts";
+import { Referrers } from "@prisma/client";
+import { existsSync, writeFileSync, readFileSync } from 'fs'
+
+
 export enum Network {
   mainnet = "mainnet",
   sepolia = "sepolia",
@@ -42,8 +45,9 @@ export function getAddresses(network: Network): NetworkAddresses {
 export async function readReferrers(): Promise<Referrers[]> {
   const PATH = "./referrers.json";
   try {
-    await Deno.stat(PATH);
-    return JSON.parse(await Deno.readTextFile(PATH));
+    if (existsSync(PATH)) {
+      return JSON.parse(readFileSync(PATH, { encoding: 'utf-8' }))
+    }
   } catch (err) {
     console.log("referrers.json not found", err);
   }
@@ -52,5 +56,5 @@ export async function readReferrers(): Promise<Referrers[]> {
 
 export async function saveReferrers(referrers: Referrers[]) {
   const PATH = "./referrers.json";
-  await Deno.writeTextFile(PATH, JSON.stringify(referrers));
+  writeFileSync(PATH, JSON.stringify(referrers));
 }

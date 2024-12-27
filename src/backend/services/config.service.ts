@@ -4,7 +4,7 @@ import {
   getProvider,
   Network,
   NetworkConfig,
-} from "./utils.ts";
+} from "./utils";
 import { Injectable } from "@nestjs/common";
 
 @Injectable()

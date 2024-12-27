@@ -1,12 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "./config.service.ts";
-import { Contract } from "npm:starknet";
-import { ABI as LSTAbi } from "../abis/LST.ts";
-import { getAddresses } from "./constants.ts";
-import { getNetwork } from "./utils.ts";
-import { ExchangeRate, PrismaClient } from "generated/index.d.ts";
-import { prisma } from "prisma/client.ts";
+import { ConfigService } from "./config.service";
+import { Contract } from "starknet";
+import { ABI as LSTAbi } from "../abis/LST";
+import { getAddresses } from "./constants";
+import { getNetwork } from "./utils";
 import { Decimal } from "@prisma/client/runtime/library";
+import { prisma } from "../../../prisma/client";
+import { ExchangeRate, PrismaClient } from "@prisma/client";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

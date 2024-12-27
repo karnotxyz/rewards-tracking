@@ -1,10 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Commissions, PrismaClient } from "generated/index.d.ts";
-import { prisma } from "prisma/client.ts";
-import { assert } from "@std/assert";
-import { readReferrers, saveReferrers } from "./constants.ts";
-import { sortEntries } from "./utils.ts";
+import assert = require("assert");
+import { readReferrers, saveReferrers } from "./constants";
+import { sortEntries } from "./utils";
 import { Decimal } from "@prisma/client/runtime/library";
+import { Commissions, PrismaClient } from "@prisma/client";
+import { prisma } from "../../../prisma/client";
 
 @Injectable()
 export class ReferrerService {

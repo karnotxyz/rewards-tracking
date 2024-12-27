@@ -1,17 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { deposits, transfer, withdrawals } from "generated/index.d.ts";
-import { prisma } from "prisma/client.ts";
-import { sortEntries } from "./utils.ts";
-import { assert } from "@std/assert";
-import type {
-  Ledger,
-  PrismaClient,
-  TransactionType,
-} from "generated/index.d.ts";
+import { sortEntries } from "./utils";
+import assert = require("assert");
 
 // The types of the prisma should be imported this way
 // While the type of the prisma schema models will come from the generated files
 import { Decimal } from "@prisma/client/runtime/library";
+import { deposits, Ledger, PrismaClient, TransactionType, transfer, withdrawals } from "@prisma/client";
+import { prisma } from "../../../prisma/client";
 
 export type WithDepositEventType = deposits & { eventType?: "deposit" };
 export type WithWithdrawalEventType = withdrawals & {

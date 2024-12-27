@@ -1,7 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
-import { LedgerService } from "../services/ledger.service.ts";
-import { LSTService } from "../services/lst.service.ts";
-import { ReferrerService } from "../services/referrer.service.ts";
+import { LedgerService } from "../services/ledger.service";
+import { LSTService } from "../services/lst.service";
+import { ReferrerService } from "../services/referrer.service";
 
 @Controller()
 export class RewardsController {
