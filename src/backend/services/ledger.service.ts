@@ -32,6 +32,11 @@ export class LedgerService {
   async populateLedger() {
     this.logger.log("Populating ledger...");
 
+
+    console.log("NODE ENV", process.env.NODE_ENV);
+    console.log("Connection uri used in app", process.env.DATABASE_URL);
+
+
     // Get the checkpoints from the processed state table
     let [lastDeposit, lastWithdrawal, lastTransfer] = await this.prisma
       .$transaction([

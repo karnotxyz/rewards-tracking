@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { LedgerService } from  "../services/ledger.service";
+import { LedgerService } from "../services/ledger.service";
 import { LSTService } from "../services/lst.service";
 import { ReferrerService } from "../services/referrer.service";
 
@@ -9,7 +9,7 @@ export class RewardsController {
     private readonly ledgerService: LedgerService,
     private readonly rpcService: LSTService,
     private readonly referrerService: ReferrerService,
-  ) {}
+  ) { }
 
   // TODO: Update to Post later
   @Get("/rewards")
