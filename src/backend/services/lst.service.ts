@@ -5,18 +5,20 @@ import { ABI as LSTAbi } from "../abis/LST";
 import { getAddresses } from "./constants";
 import { getNetwork } from "./utils";
 import { Decimal } from "@prisma/client/runtime/library";
-import { prisma } from "../../../prisma/client";
 import { ExchangeRate, PrismaClient } from "@prisma/client";
+import { PrismaService } from "./prisma.service";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
 export class LSTService {
   private readonly logger: Logger;
-  private readonly prisma: PrismaClient;
   readonly LST: Contract;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService
+  ) {
     this.prisma = prisma;
     this.logger = new Logger(LSTService.name);
 

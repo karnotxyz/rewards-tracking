@@ -4,14 +4,14 @@ import { readReferrers, saveReferrers } from "./constants";
 import { sortEntries } from "./utils";
 import { Decimal } from "@prisma/client/runtime/library";
 import { Commissions, PrismaClient } from "@prisma/client";
-import { prisma } from "../../../prisma/client";
+import { PrismaService } from "./prisma.service";
 
 @Injectable()
 export class ReferrerService {
   private readonly logger: Logger;
-  private readonly prisma: PrismaClient;
-  constructor() {
-    this.prisma = prisma;
+  constructor(
+    private readonly prisma: PrismaService
+  ) {
     this.logger = new Logger(ReferrerService.name);
   }
 
@@ -116,7 +116,7 @@ export class ReferrerService {
             if (i > 0 && allExchangeRates) {
               const exchangeRateObjectBefore = allExchangeRates?.find((rate) =>
                 rate.block_number ===
-                  ledgerEntries[lastReferralAmountChangeIndex]?.block_number
+                ledgerEntries[lastReferralAmountChangeIndex]?.block_number
               );
               if (exchangeRateObjectBefore) {
                 exchangeRateBefore = exchangeRateObjectBefore.rate;

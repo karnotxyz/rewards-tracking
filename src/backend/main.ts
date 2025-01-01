@@ -9,12 +9,11 @@ import { ConfigService } from "./services/config.service";
 import { ReferrerService } from "./services/referrer.service";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
-
 import * as dotenv from "dotenv";
-dotenv.config();
+import { PrismaService } from "./services/prisma.service";
 
 @Module({
-  providers: [LedgerService, LSTService, ConfigService, ReferrerService],
+  providers: [LedgerService, PrismaService, LSTService, ConfigService, ReferrerService],
   controllers: [
     StatusController,
     RewardsController,
@@ -32,6 +31,13 @@ async function bootstrap() {
       .build();
     const documentFactory = () => SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, documentFactory);
+
+
+    const envPath = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
+    dotenv.config({ path: envPath, override: true });
+    console.log("Environment variables loaded from: ", envPath);
+    console.log("db url", process.env.DATABASE_URL);
+
 
     await app.listen(process.env.PORT ?? 3000);
     console.log(`Application is running on: ${await app.getUrl()}`);

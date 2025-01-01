@@ -5,8 +5,8 @@ import assert = require("assert");
 // The types of the prisma should be imported this way
 // While the type of the prisma schema models will come from the generated files
 import { Decimal } from "@prisma/client/runtime/library";
-import { deposits, Ledger, PrismaClient, TransactionType, transfer, withdrawals } from "@prisma/client";
-import { prisma } from "../../../prisma/client";
+import { deposits, Ledger, TransactionType, transfer, withdrawals } from "@prisma/client";
+import { PrismaService } from "./prisma.service";
 
 export type WithDepositEventType = deposits & { eventType?: "deposit" };
 export type WithWithdrawalEventType = withdrawals & {
@@ -18,10 +18,8 @@ type LedgerWithOptionalId = Omit<Ledger, "id"> & Partial<Pick<Ledger, "id">>;
 @Injectable()
 export class LedgerService {
   private readonly logger: Logger;
-  private readonly prisma: PrismaClient;
 
-  constructor() {
-    this.prisma = prisma;
+  constructor(private readonly prisma: PrismaService) {
     this.logger = new Logger(LedgerService.name);
     this.logger.log("LedgerService instantiated");
     Decimal.set({ precision: 30, rounding: Decimal.ROUND_DOWN });

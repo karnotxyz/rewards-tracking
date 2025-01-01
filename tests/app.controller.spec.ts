@@ -12,7 +12,6 @@ import { execSync } from "child_process";
 import * as request from "supertest";
 import { RewardsController } from "../src/backend/controllers/rewards.controller";
 import { LedgerService } from "../src/backend/services/ledger.service";
-// import { LedgerService } from "src/backend/services/ledger.service";
 
 
 let prismaClient: PrismaClient;
@@ -22,12 +21,12 @@ let app: INestApplication;
 describe("AppController (e2e)", () => {
   beforeAll(async () => {
     pgContainer = await new PostgreSqlContainer()
-      .withUsername('test')
-      .withPassword('test')
-      .withDatabase('test')
+      .withUsername('postgres')
+      .withPassword('postgres')
+      .withDatabase('testdb')
       .withExposedPorts({
         container: 5432,
-        host: 5433,
+        host: 5432,
       })
       .start();
     const connectionURI = pgContainer.getConnectionUri();
@@ -108,6 +107,10 @@ describe("AppController (e2e)", () => {
     console.log("Deposits:", deposits);
 
     await request(app.getHttpServer()).get("/rewards");
+
+
+    const ledgerNew = await prismaClient.ledger.findMany();
+    console.log("Ledger:", ledger.length);
 
     // let rewardController = app.get<RewardsController>(RewardsController);
     // let ledgerService = app.get<LedgerService>(LedgerService);
