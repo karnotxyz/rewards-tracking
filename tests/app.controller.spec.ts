@@ -3,7 +3,7 @@ import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,
 } from "@testcontainers/postgresql";
-import { PrismaClient } from "@prisma/client";
+import { deposits, PrismaClient } from "@prisma/client";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { AppModule } from "../src/backend/main";
@@ -12,12 +12,18 @@ import { execSync } from "child_process";
 import * as request from "supertest";
 import { RewardsController } from "../src/backend/controllers/rewards.controller";
 import { LedgerService } from "../src/backend/services/ledger.service";
+import { Decimal } from "@prisma/client/runtime/library";
 
 
 let prismaClient: PrismaClient;
 let pgContainer: StartedPostgreSqlContainer;
 let app: INestApplication;
 let connectionURI: string;
+
+let user1 = "0x123";
+let user2 = "0x456";
+
+jest.setTimeout(60000);
 
 describe("AppController (e2e)", () => {
   beforeAll(async () => {
@@ -51,13 +57,7 @@ describe("AppController (e2e)", () => {
   });
 
   afterEach(async () => {
-    // Clean up database after each test
-    // try {
-    //   await prismaClient.$executeRaw`TRUNCATE TABLE deposits CASCADE`;
-    // } catch (error) {
-    //   console.error('Error truncating table:', error);
-    //   throw error;
-    // }
+    execSync("npx prisma migrate reset -f", { env: { ...process.env, DATABASE_URL: connectionURI } });
   });
 
   afterAll(async () => {
@@ -104,36 +104,78 @@ describe("AppController (e2e)", () => {
   it("Should process deposits", async () => {
 
     const depositsBefore = await prismaClient.deposits.findMany();
-    console.log("Deposits Before:", depositsBefore);
-    // Create test deposit
-    await prismaClient.deposits.create({
-      data: {
+    expect(depositsBefore.length).toBe(0);
+    expect(depositsBefore).toEqual([]);
+
+    const newDeposits = [
+      {
         block_number: 1,
-        timestamp: 1234567890,
-        sender: '0x123',
-        owner: '0x456',
-        assets: '1000',
-        shares: '1000'
+        tx_index: 1,
+        event_index: 1,
+        timestamp: 1,
+
+        sender: user1,
+        owner: user1,
+
+        assets: new Decimal(1000),
+        shares: new Decimal(1000),
+        referrer: null,
+      },
+      {
+        block_number: 2,
+        tx_index: 1,
+        event_index: 1,
+        timestamp: 1,
+
+        sender: user2,
+        owner: user2,
+
+        assets: new Decimal(1000),
+        shares: new Decimal(1000),
+        referrer: "9EFE5",
       }
+    ];
+
+
+    // Create test deposit
+    await prismaClient.deposits.createMany({
+      data: newDeposits,
     });
 
-    const deposits = await prismaClient.deposits.findMany();
+    const depositsAfter = await prismaClient.deposits.findMany();
+    expect(depositsAfter).toMatchObject(newDeposits);
+
     const ledger = await prismaClient.ledger.findMany();
-    console.log("Ledger:", ledger.length);
-    console.log("Deposits After:", deposits);
+    expect(ledger).toEqual([]);
 
     await request(app.getHttpServer()).get("/rewards");
 
 
-    const ledgerNew = await prismaClient.ledger.findMany();
-    console.log("Ledger New:", ledgerNew);
-    expect(ledgerNew.length).toBeGreaterThan(ledger.length);
+    const newLedgerEntries = [
+      {
+        block_number: 1,
+        tx_index: 1,
+        event_index: 1,
+        order_index: 0,
 
-    // let rewardController = app.get<RewardsController>(RewardsController);
-    // let ledgerService = app.get<LedgerService>(LedgerService);
-    // await rewardController.populateLedger();
+        user: user1,
+        amount: new Decimal("1000"),
+        type: "DEPOSIT",
+        referral_code: null,
+      },
+      {
+        block_number: 2,
+        tx_index: 1,
+        event_index: 1,
+        order_index: 0,
+        user: user2,
+        amount: new Decimal("1000"),
+        type: "DEPOSIT",
+        referral_code: "9EFE5",
+      }
+    ]
 
-    // const ledgerNew = await prismaClient.ledger.findMany();
-    // console.log("Ledger:", ledgerNew);
+    const ledgerAfter = await prismaClient.ledger.findMany();
+    expect(ledgerAfter).toMatchObject(newLedgerEntries);
   });
 });
