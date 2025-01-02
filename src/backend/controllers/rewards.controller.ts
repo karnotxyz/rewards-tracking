@@ -9,7 +9,7 @@ export class RewardsController {
     private readonly ledgerService: LedgerService,
     private readonly rpcService: LSTService,
     private readonly referrerService: ReferrerService,
-  ) {}
+  ) { }
 
   // TODO: Update to Post later
   @Get("/rewards")
